@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 from pathlib import Path
 from .pipeline import LangGraphAgent
 
@@ -15,6 +16,11 @@ def run(args):
     }
     if args.input:
         sample = json.loads(Path(args.input).read_text())
+
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
 
     agent = LangGraphAgent(config_path=args.config)
     final = agent.run(sample)
@@ -35,6 +41,9 @@ def main():
     )
     run_parser.add_argument(
         "--input", "-i", default=None, help="Path to JSON file with input payload (optional)"
+    )
+    run_parser.add_argument(
+        "--debug", action="store_true", default=False, help="Enable debug logging"
     )
     run_parser.set_defaults(func=run)
 

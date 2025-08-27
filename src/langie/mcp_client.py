@@ -1,17 +1,20 @@
 """
 MCP client integrated with Knowledge Base retriever.
-Routes abilities to KB (via retriever) instead of simulated responses.
+
+Responsibilities:
+- Route KB queries to the retriever (query_kb / index_kb).
+- Provide a clear error for unimplemented abilities so integration is explicit.
+- No silent dummy behavior: unhandled abilities raise an exception / return explicit error.
 """
 
 import logging
 from typing import Any, Dict
 
-# Import retriever functions
 from .retriever import query_kb, index_kb
 
 logger = logging.getLogger(__name__)
 
-# Index KB on startup
+# Index KB on startup (idempotent)
 try:
     index_kb()
     logger.info("Knowledge base indexed successfully on MCP startup.")
@@ -19,47 +22,51 @@ except Exception as e:
     logger.exception("Failed to index KB at startup: %s", e)
 
 
-def call_common(ability_name: str, state: Dict[str, Any]) -> Any:
+class MCPClientError(RuntimeError):
+    pass
+
+
+def call_common(ability_name: str, state: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Route to COMMON abilities.
-    For now: 
-      - "faq_query" ability -> KB retrieval
-      - others -> fallback to simulated response
-    """
-    try:
-        if ability_name == "faq_query":
-            user_query = state.get("user_query", "")
-            if not user_query:
-                return {"error": "No user_query provided"}
-            
-            logger.info("COMMON -> executing KB query: %s", user_query)
-            return {"kb_results": query_kb(user_query)}
-
-    except Exception as e:
-        logger.exception("Error calling COMMON ability %s: %s", ability_name, e)
-
-    # fallback simulation
-    logger.info("COMMON -> simulated call for %s", ability_name)
-    return {f"{ability_name}_status": "simulated_common_done"}
-
-
-def call_atlas(ability_name: str, state: Dict[str, Any]) -> Any:
-    """
-    Route to ATLAS abilities.
-    Currently identical to COMMON but allows extension later.
+    Route to COMMON abilities. Implemented abilities:
+      - "faq_query" / "knowledge_base_search": uses retriever.query_kb
+    Other abilities must be implemented explicitly to avoid silent fallbacks.
     """
     try:
-        if ability_name == "faq_query":
-            user_query = state.get("user_query", "")
+        if ability_name in ("faq_query", "knowledge_base_search"):
+            user_query = state.get("user_query") or state.get("query") or ""
             if not user_query:
-                return {"error": "No user_query provided"}
-            
-            logger.info("ATLAS -> executing KB query: %s", user_query)
-            return {"kb_results": query_kb(user_query)}
+                logger.warning("call_common: faq_query invoked with empty user_query")
+                return {"kb_results": []}
+            logger.info("COMMON -> executing KB query (faq_query): %s", user_query)
+            kb = query_kb(user_query)
+            return {"kb_results": kb}
 
+        # Add explicit mappings for other COMMON abilities here if you implement them.
+        logger.error("COMMON -> Unimplemented ability called: %s", ability_name)
+        raise MCPClientError(f"COMMON ability '{ability_name}' is not implemented in mcp_client.")
     except Exception as e:
-        logger.exception("Error calling ATLAS ability %s: %s", ability_name, e)
+        logger.exception("Error in call_common for ability %s: %s", ability_name, e)
+        raise
 
-    # fallback simulation
-    logger.info("ATLAS -> simulated call for %s", ability_name)
-    return {f"{ability_name}_status": "simulated_atlas_done"}
+
+def call_atlas(ability_name: str, state: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Route to ATLAS abilities. Currently supports KB queries as well.
+    Distinction left for future extension.
+    """
+    try:
+        if ability_name in ("faq_query", "knowledge_base_search"):
+            user_query = state.get("user_query") or state.get("query") or ""
+            if not user_query:
+                logger.warning("call_atlas: faq_query invoked with empty user_query")
+                return {"kb_results": []}
+            logger.info("ATLAS -> executing KB query (faq_query): %s", user_query)
+            kb = query_kb(user_query)
+            return {"kb_results": kb}
+
+        logger.error("ATLAS -> Unimplemented ability called: %s", ability_name)
+        raise MCPClientError(f"ATLAS ability '{ability_name}' is not implemented in mcp_client.")
+    except Exception as e:
+        logger.exception("Error in call_atlas for ability %s: %s", ability_name, e)
+        raise

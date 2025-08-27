@@ -1,42 +1,50 @@
-import json
-from sentence_transformers import SentenceTransformer
+# src/langie/retriever.py
 import chromadb
+from chromadb.api.types import EmbeddingFunction
+from sentence_transformers import SentenceTransformer
 
-# Load local embedding model
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+DB_PATH = "data/chroma"
+COLLECTION_NAME = "faq"
 
-chroma_client = chromadb.Client()
-collection = chroma_client.create_collection("kb_faq")
+class SentenceTransformerEmbeddingFunction(EmbeddingFunction):
+    def __init__(self, model_name="all-MiniLM-L6-v2"):
+        self.model = SentenceTransformer(model_name)
 
-def load_kb(path="data/kb_faq.json"):
-    """Load KB JSON file."""
-    with open(path, "r") as f:
-        return json.load(f)
+    def __call__(self, input):
+        # input is a list[str]
+        return self.model.encode(input).tolist()
 
-def get_embedding(text: str):
-    """Generate embedding for a text string."""
-    return embedding_model.encode(text).tolist()
 
-def index_kb():
-    """Index knowledge base into Chroma."""
-    kb = load_kb()
-    for entry in kb:
-        embedding = get_embedding(entry["question"])
-        collection.add(
-            ids=[entry["id"]],
-            embeddings=[embedding],
-            metadatas=[{"answer": entry["answer"]}],
-            documents=[entry["question"]],
+class Retriever:
+    def __init__(self):
+        # Load persisted Chroma
+        self.client = chromadb.PersistentClient(path=DB_PATH)
+
+        # Pass in wrapper embedding function
+        self.collection = self.client.get_or_create_collection(
+            name=COLLECTION_NAME,
+            embedding_function=SentenceTransformerEmbeddingFunction()
         )
 
-def query_kb(user_query: str, top_k=2):
-    """Query KB with a user question and return top matches."""
-    embedding = get_embedding(user_query)
-    results = collection.query(query_embeddings=[embedding], n_results=top_k)
-    return [
-        {"question": doc, "answer": meta["answer"]}
-        for doc, meta in zip(results["documents"][0], results["metadatas"][0])
-    ]
+    def search(self, query: str, top_k: int = 3):
+        """Search FAQ KB using local embeddings + ChromaDB."""
+        results = self.collection.query(
+            query_texts=[query],
+            n_results=top_k
+        )
 
-# Index once on startup
-index_kb()
+        hits = []
+        for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
+            hits.append({
+                "question": meta.get("question"),
+                "answer": meta.get("answer"),
+                "doc": doc
+            })
+        return hits
+
+
+if __name__ == "__main__":
+    retriever = Retriever()
+    res = retriever.search("What is your return policy?")
+    for r in res:
+        print(f"Q: {r['question']}\nA: {r['answer']}\n")

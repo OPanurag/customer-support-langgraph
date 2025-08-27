@@ -12,6 +12,9 @@ stages:
       - name: accept_payload
         server: COMMON
     prompt: "Capture incoming payload and validate schema."
+    transitions:
+      success: UNDERSTAND
+      failure: COMPLETE
 
   - name: UNDERSTAND
     mode: deterministic
@@ -21,6 +24,11 @@ stages:
       - name: extract_entities
         server: ATLAS
     prompt: "Parse query and extract key entities (product, issue, intent)."
+    transitions:
+      missing_entities: CLARIFY
+      low_confidence: CLARIFY
+      success: RETRIEVE
+      failure: COMPLETE
 
   - name: CLARIFY
     mode: conditional
@@ -31,6 +39,9 @@ stages:
       - name: store_customer_answer
         server: COMMON
     prompt: "Ask clarifying question if confidence < 80% or entities missing."
+    transitions:
+      resolved: RETRIEVE
+      unresolved: COMPLETE
 
   - name: RETRIEVE
     mode: deterministic
@@ -40,6 +51,9 @@ stages:
       - name: store_kb_results
         server: COMMON
     prompt: "Search KB for potential solutions."
+    transitions:
+      results_found: DECIDE
+      no_results: DECIDE   # still goes to DECIDE but will likely escalate
 
   - name: DECIDE
     mode: non-deterministic
@@ -49,6 +63,10 @@ stages:
       - name: escalation_decision
         server: ATLAS
     prompt: "Evaluate KB results, decide to resolve or escalate."
+    transitions:
+      resolve: ACT
+      escalate: ACT
+      failure: COMPLETE
 
   - name: ACT
     mode: deterministic
@@ -58,6 +76,9 @@ stages:
       - name: trigger_notifications
         server: COMMON
     prompt: "Update ticket status and notify relevant stakeholders."
+    transitions:
+      success: RESPOND
+      failure: COMPLETE
 
   - name: RESPOND
     mode: deterministic
@@ -65,6 +86,9 @@ stages:
       - name: generate_customer_response
         server: COMMON
     prompt: "Generate final response for the customer."
+    transitions:
+      success: COMPLETE
+      failure: COMPLETE
 
   - name: COMPLETE
     mode: deterministic
@@ -72,3 +96,4 @@ stages:
       - name: output_payload
         server: COMMON
     prompt: "Return final structured output."
+    transitions: {}

@@ -1,120 +1,99 @@
 import yaml
-from pathlib import Path
-import logging
-from typing import Dict, Any
-from .mcp_client import call_common, call_atlas
-from .models import InputPayload
+from typing import Dict, Any, Callable
+from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
 
-from .logger import get_logger
+from .abilities import call_common, call_atlas
+from .retriever import query_kb
+from .logger import logger
 
-logger = get_logger(__name__)
 
+# -------- State Definition --------
+class PipelineState(Dict[str, Any]):
+    """Shared state passed between graph nodes."""
+    pass
+
+
+# -------- Ability Wrappers --------
+def run_common(state: PipelineState, ability: str, params: Dict[str, Any]) -> PipelineState:
+    logger.info(f"[COMMON] Running ability={ability} with params={params}")
+    result = call_common(ability, params)
+    state[ability] = result
+    return state
+
+
+def run_atlas(state: PipelineState, ability: str, params: Dict[str, Any]) -> PipelineState:
+    logger.info(f"[ATLAS] Running ability={ability} with params={params}")
+    result = call_atlas(ability, params)
+    state[ability] = result
+    return state
+
+
+def run_retriever(state: PipelineState, query: str) -> PipelineState:
+    logger.info(f"[RETRIEVER] Querying KB with: {query}")
+    result = query_kb(query)
+    state["retriever_result"] = result
+    return state
+
+
+# -------- Graph Orchestrator --------
 class LangGraphAgent:
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str = "config/stages.yaml"):
         self.config_path = config_path
-        self.config = yaml.safe_load(Path(config_path).read_text())
-        self.state: Dict[str, Any] = {"logs": []}
-        logger.info("⚙️ Loaded pipeline config from %s", config_path)
+        self.graph = None
+        self.state = PipelineState()
+        self._load_config_and_build()
 
-    def validate_input(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        validated = InputPayload.model_validate(payload)
-        return validated.model_dump()
+    def _load_config_and_build(self):
+        with open(self.config_path, "r") as f:
+            config = yaml.safe_load(f)
 
-    def run(self, input_payload: Dict[str, Any]) -> Dict[str, Any]:
-        # validate & seed
-        try:
-            validated = self.validate_input(input_payload)
-        except Exception as e:
-            logger.error("Input validation failed: %s", e)
-            raise
-        self.state.update(validated)
-        self._log("run_started", {"input_summary": {k: self.state.get(k) for k in ['ticket_id','customer_name']}})
+        stages = config.get("stages", [])
+        logger.info(f"⚙️ Loaded {len(stages)} stages from {self.config_path}")
 
-        for stage in self.config.get("stages", []):
-            name = stage["name"]
-            mode = stage.get("mode", "deterministic")
-            self._log("stage_start", {"stage": name, "mode": mode})
+        # Create LangGraph
+        workflow = StateGraph(PipelineState)
 
-            if mode == "deterministic":
-                for ability in stage.get("abilities", []):
-                    self._execute_ability(name, ability)
-            elif mode == "conditional":
-                cond = stage.get("condition", "")
-                if self._eval_condition(cond):
-                    for ability in stage.get("abilities", []):
-                        self._execute_ability(name, ability)
-                else:
-                    logger.info("Skipping conditional stage %s (cond=%s)", name, cond)
-            elif mode == "non-deterministic":
-                # execute solution_evaluation first, then possibly escalate
-                # find solution_evaluation ability
-                for ability in stage.get("abilities", []):
-                    if ability["name"] == "solution_evaluation":
-                        res = self._execute_ability(name, ability)
-                        break
-                score = self.state.get("solution_score", 0)
-                if score < 90:
-                    # escalate if configured
-                    for ability in stage.get("abilities", []):
-                        if ability["name"] == "escalation_decision":
-                            self._execute_ability(name, ability)
-                # always run update_payload if present
-                for ability in stage.get("abilities", []):
-                    if ability["name"] == "update_payload":
-                        self._execute_ability(name, ability)
-            else:
-                logger.warning("Unknown stage mode %s for stage %s", mode, name)
+        # Dynamically add nodes
+        for idx, stage in enumerate(stages):
+            stage_name = stage["name"]
+            ability = stage["ability"]
+            ability_type = stage.get("type", "common")
+            params = stage.get("params", {})
 
-            self._log("stage_end", {"stage": name})
+            def make_node(stage_name=stage_name, ability=ability,
+                          ability_type=ability_type, params=params) -> Callable:
+                def node_fn(state: PipelineState) -> PipelineState:
+                    if ability_type == "common":
+                        return run_common(state, ability, params)
+                    elif ability_type == "atlas":
+                        return run_atlas(state, ability, params)
+                    elif ability_type == "retriever":
+                        query = state.get("query", params.get("query", ""))
+                        return run_retriever(state, query)
+                    else:
+                        raise ValueError(f"Unknown ability_type={ability_type}")
+                return node_fn
 
-        self._log("run_completed", {"final_keys": list(self.state.keys())})
-        return self.state
+            workflow.add_node(stage_name, make_node())
 
-    def _execute_ability(self, stage_name: str, ability: Dict[str, Any]) -> Any:
-        name = ability["name"]
-        server = ability.get("server", "COMMON")
-        self._log("ability_start", {"stage": stage_name, "ability": name, "server": server})
+            # Link stages linearly (can extend later with conditional routing)
+            if idx > 0:
+                prev_stage = stages[idx - 1]["name"]
+                workflow.add_edge(prev_stage, stage_name)
 
-        try:
-            if server.upper() == "ATLAS":
-                result = call_atlas(name, self.state)
-            else:
-                result = call_common(name, self.state)
-        except Exception as e:
-            logger.exception("Ability %s failed in stage %s", name, stage_name)
-            result = {"error": str(e)}
+        # Last stage leads to END
+        if stages:
+            workflow.add_edge(stages[-1]["name"], END)
 
-        # merge results
-        if isinstance(result, dict):
-            for k, v in result.items():
-                if k in self.state and isinstance(self.state[k], dict) and isinstance(v, dict):
-                    self.state[k].update(v)  # deep merge dicts
-                else:
-                    self.state[k] = v
-        else:
-            self.state[f"{stage_name}_{name}"] = result or "done"
+        # Compile graph with in-memory checkpointing
+        memory = MemorySaver()
+        self.graph = workflow.compile(checkpointer=memory)
+        logger.info("✅ LangGraph pipeline built successfully")
 
-        self._log("ability_end", {"stage": stage_name, "ability": name, "result_summary": self._summarize(result)})
-        return result
-
-    def _eval_condition(self, cond: str) -> bool:
-        if not cond:
-            return True
-        cond = cond.lower()
-        try:
-            if cond == "missing_entities":
-                return not self.state.get("entities")
-            if cond == "low_confidence":
-                return self.state.get("solution_score", 100) < 80
-        except Exception:
-            return False
-        return False
-
-    def _log(self, event: str, payload: Dict[str, Any]):
-        logger.info("%s %s", event, payload)
-        self.state.setdefault("logs", []).append({"event": event, "payload": payload})
-
-    def _summarize(self, result: Any):
-        if isinstance(result, dict):
-            return {k: (v if isinstance(v,(int,str,bool)) else str(type(v))) for k,v in list(result.items())[:5]}
-        return result
+    def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        logger.info(f"▶️ Starting pipeline run with input={input_data}")
+        self.state.update(input_data)
+        final_state = self.graph.invoke(self.state)
+        logger.info(f"🏁 Pipeline completed. Final state keys: {list(final_state.keys())}")
+        return final_state
