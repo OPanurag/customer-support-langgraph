@@ -43,8 +43,8 @@ class Retriever:
         return hits
 
 
-if __name__ == "__main__":
-    retriever = Retriever()
-    res = retriever.search("What is your return policy?")
-    for r in res:
-        print(f"Q: {r['question']}\nA: {r['answer']}\n")
+# if __name__ == "__main__":
+#     retriever = Retriever()
+#     res = retriever.search("What is your return policy?")
+#     for r in res:
+#         print(f"Q: {r['question']}\nA: {r['answer']}\n")

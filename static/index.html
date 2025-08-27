@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LangGraph Customer Support</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  input, textarea { width: 100%; margin-bottom: 10px; padding: 8px; }
+  button { padding: 10px 20px; }
+  .kb-result { border: 1px solid #ccc; padding: 10px; margin: 10px 0; border-radius: 5px; }
+  .logs { background: #f9f9f9; padding: 10px; border-radius: 5px; margin-top: 20px; }
+  .logs pre { max-height: 200px; overflow-y: auto; }
+</style>
+</head>
+<body>
+<h2>LangGraph Customer Support</h2>
+
+<form id="queryForm">
+  <label>Customer Name:</label>
+  <input type="text" id="customer_name" placeholder="Alice">
+  
+  <label>Email:</label>
+  <input type="email" id="email" placeholder="alice@example.com">
+  
+  <label>Query:</label>
+  <textarea id="query" placeholder="Enter your question"></textarea>
+  
+  <label>Priority:</label>
+  <input type="text" id="priority" placeholder="Normal">
+  
+  <label>Ticket ID:</label>
+  <input type="text" id="ticket_id" placeholder="TKT-1234">
+  
+  <button type="submit">Submit</button>
+</form>
+
+<h3>KB Results</h3>
+<div id="kbResults"></div>
+
+<h3>Pipeline Logs</h3>
+<div class="logs" id="logs"></div>
+
+<script>
+document.getElementById("queryForm").addEventListener("submit", async function(e) {
+  e.preventDefault();
+
+  const payload = {
+    customer_name: document.getElementById("customer_name").value,
+    email: document.getElementById("email").value,
+    query: document.getElementById("query").value,
+    priority: document.getElementById("priority").value,
+    ticket_id: document.getElementById("ticket_id").value,
+  };
+
+  const res = await fetch("/ask", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+
+  // Show KB results
+  const kbDiv = document.getElementById("kbResults");
+  kbDiv.innerHTML = "";
+  if (data.kb_results) {
+    data.kb_results.forEach(kb => {
+      const card = document.createElement("div");
+      card.className = "kb-result";
+      card.innerHTML = `<strong>Q:</strong> ${kb.question}<br><strong>A:</strong> ${kb.answer}`;
+      kbDiv.appendChild(card);
+    });
+  }
+
+  // Show logs
+  document.getElementById("logs").innerHTML = `<pre>${JSON.stringify(data.logs, null, 2)}</pre>`;
+});
+</script>
+</body>
+</html>
