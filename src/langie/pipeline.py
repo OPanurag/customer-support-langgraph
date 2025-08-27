@@ -2,12 +2,12 @@ import yaml
 from pathlib import Path
 import logging
 from typing import Dict, Any
-
 from .mcp_client import call_common, call_atlas
 from .models import InputPayload
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+from .logger import get_logger
+
+logger = get_logger(__name__)
 
 class LangGraphAgent:
     def __init__(self, config_path: str):
@@ -75,14 +75,22 @@ class LangGraphAgent:
         server = ability.get("server", "COMMON")
         self._log("ability_start", {"stage": stage_name, "ability": name, "server": server})
 
-        if server.upper() == "ATLAS":
-            result = call_atlas(name, self.state)
-        else:
-            result = call_common(name, self.state)
+        try:
+            if server.upper() == "ATLAS":
+                result = call_atlas(name, self.state)
+            else:
+                result = call_common(name, self.state)
+        except Exception as e:
+            logger.exception("Ability %s failed in stage %s", name, stage_name)
+            result = {"error": str(e)}
 
-        # merge dict results into state
+        # merge results
         if isinstance(result, dict):
-            self.state.update(result)
+            for k, v in result.items():
+                if k in self.state and isinstance(self.state[k], dict) and isinstance(v, dict):
+                    self.state[k].update(v)  # deep merge dicts
+                else:
+                    self.state[k] = v
         else:
             self.state[f"{stage_name}_{name}"] = result or "done"
 
@@ -90,15 +98,16 @@ class LangGraphAgent:
         return result
 
     def _eval_condition(self, cond: str) -> bool:
-        # simple boolean expression interpreter for known tokens
         if not cond:
             return True
         cond = cond.lower()
-        if "missing_entities" in cond and not self.state.get("entities"):
-            return True
-        if "low_confidence" in cond and self.state.get("solution_score", 100) < 80:
-            return True
-        # fallback: if any token 'or' present, evaluate loosely
+        try:
+            if cond == "missing_entities":
+                return not self.state.get("entities")
+            if cond == "low_confidence":
+                return self.state.get("solution_score", 100) < 80
+        except Exception:
+            return False
         return False
 
     def _log(self, event: str, payload: Dict[str, Any]):

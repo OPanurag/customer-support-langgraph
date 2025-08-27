@@ -103,16 +103,17 @@ def update_payload(state: Dict[str, Any]) -> Dict[str, Any]:
     return {"decision_recorded": True}
 
 def update_ticket(state: Dict[str, Any], server: str="ATLAS") -> Dict[str, Any]:
-    # set status depending on escalate flag
+    # escalate → escalated
     if state.get("escalated"):
         return {"ticket_status": "escalated"}
-    else:
-        return {"ticket_status": "in_progress"}
+    # high confidence + answer → resolved
+    elif state.get("solution_score", 0) >= 90:
+        return {"ticket_status": "resolved"}
+    return {"ticket_status": "in_progress"}
 
 def close_ticket(state: Dict[str, Any], server: str="ATLAS") -> Dict[str, Any]:
-    if state.get("ticket_status") == "resolved":
-        return {"closed": True}
-    return {"closed": False}
+    return {"closed": state.get("ticket_status") == "resolved"}
+
 
 def generate_customer_response(state: Dict[str, Any]) -> Dict[str, Any]:
     name = state.get("customer_name","Customer")

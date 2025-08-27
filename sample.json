@@ -1,1 +1,7 @@
-{"customer_name": "Bob", "email": "bob@example.com", "query": "Need refund"}
+{
+  "customer_name": "Alice",
+  "email": "alice@example.com",
+  "query": "My phone order #123 hasn’t arrived",
+  "priority": "High",
+  "ticket_id": "TKT-5678"
+}
