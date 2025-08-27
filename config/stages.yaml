@@ -1,0 +1,74 @@
+input_schema:
+  - customer_name
+  - email
+  - query
+  - priority
+  - ticket_id
+
+stages:
+  - name: INTAKE
+    mode: deterministic
+    abilities:
+      - name: accept_payload
+        server: COMMON
+    prompt: "Capture incoming payload and validate schema."
+
+  - name: UNDERSTAND
+    mode: deterministic
+    abilities:
+      - name: parse_request_text
+        server: COMMON
+      - name: extract_entities
+        server: ATLAS
+    prompt: "Parse query and extract key entities (product, issue, intent)."
+
+  - name: CLARIFY
+    mode: conditional
+    condition: "missing_entities or low_confidence"
+    abilities:
+      - name: ask_clarifying_question
+        server: ATLAS
+      - name: store_customer_answer
+        server: COMMON
+    prompt: "Ask clarifying question if confidence < 80% or entities missing."
+
+  - name: RETRIEVE
+    mode: deterministic
+    abilities:
+      - name: knowledge_base_search
+        server: ATLAS
+      - name: store_kb_results
+        server: COMMON
+    prompt: "Search KB for potential solutions."
+
+  - name: DECIDE
+    mode: non-deterministic
+    abilities:
+      - name: solution_evaluation
+        server: COMMON
+      - name: escalation_decision
+        server: ATLAS
+    prompt: "Evaluate KB results, decide to resolve or escalate."
+
+  - name: ACT
+    mode: deterministic
+    abilities:
+      - name: update_ticket
+        server: ATLAS
+      - name: trigger_notifications
+        server: COMMON
+    prompt: "Update ticket status and notify relevant stakeholders."
+
+  - name: RESPOND
+    mode: deterministic
+    abilities:
+      - name: generate_customer_response
+        server: COMMON
+    prompt: "Generate final response for the customer."
+
+  - name: COMPLETE
+    mode: deterministic
+    abilities:
+      - name: output_payload
+        server: COMMON
+    prompt: "Return final structured output."

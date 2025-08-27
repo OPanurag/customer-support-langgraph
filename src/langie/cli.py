@@ -1,4 +1,6 @@
 import argparse
+from pathlib import Path
+from langie.pipeline import LangGraphAgent
 
 def main():
     parser = argparse.ArgumentParser(prog="langie", description="Langie CLI - Customer Support Bot")
@@ -15,9 +17,20 @@ def main():
     args = parser.parse_args()
     args.func(args)
 
-
 def run(args):
-    print("🚀 Langie bot started... (placeholder)")
+    import json
+    sample = {
+        "customer_name": "Alice",
+        "email": "alice@example.com",
+        "query": "My order #123 hasn’t arrived",
+        "priority": "High",
+        "ticket_id": "TKT-5678",
+    }
+    agent = LangGraphAgent(config_path="config/stages.yaml")
+    final = agent.run(sample)
+    print("\n--- Final payload ---")
+    print(json.dumps(final, indent=2))
+
 
 
 def test(args):
