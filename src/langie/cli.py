@@ -1,29 +1,11 @@
 import argparse
+import json
 from pathlib import Path
-from langie.pipeline import LangGraphAgent
-
-def main():
-    parser = argparse.ArgumentParser(prog="langie", description="Langie CLI - Customer Support Bot")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    run_parser = subparsers.add_parser("run", help="Run the Langie bot")
-    run_parser.add_argument("--config", "-c", default="config/stages.yaml",
-                             help="Path to stages YAML")
-    run_parser.add_argument("--input", "-i", default=None,
-                             help="Path to JSON file with input payload (optional)")
-    run_parser.set_defaults(func=run)
-
-    test_parser = subparsers.add_parser("test", help="Run test mode")
-    test_parser.set_defaults(func=test)
-
-    args = parser.parse_args()
-    args.func(args)
+from .pipeline import LangGraphAgent
 
 
 def run(args):
-    import json
-    from pathlib import Path
-
+    """Run the Langie bot with either sample or provided JSON input."""
     sample = {
         "customer_name": "Alice",
         "email": "alice@example.com",
@@ -39,3 +21,22 @@ def run(args):
 
     print("\n--- Final payload ---")
     print(json.dumps(final, indent=2))
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="langie", description="Langie CLI - Customer Support Bot"
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    run_parser = subparsers.add_parser("run", help="Run the Langie bot")
+    run_parser.add_argument(
+        "--config", "-c", default="config/stages.yaml", help="Path to stages YAML"
+    )
+    run_parser.add_argument(
+        "--input", "-i", default=None, help="Path to JSON file with input payload (optional)"
+    )
+    run_parser.set_defaults(func=run)
+
+    args = parser.parse_args()
+    args.func(args)
