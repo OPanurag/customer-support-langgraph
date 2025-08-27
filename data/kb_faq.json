@@ -1,0 +1,17 @@
+[
+  {
+    "id": "faq_001",
+    "question": "How do I track my order?",
+    "answer": "You can track your order by visiting the Orders section in your account or contacting support with your order ID."
+  },
+  {
+    "id": "faq_002",
+    "question": "What should I do if my order is delayed?",
+    "answer": "If your order is delayed, please allow 24–48 hours. If it still hasn’t arrived, contact our support team with your order number."
+  },
+  {
+    "id": "faq_003",
+    "question": "How do I return a product?",
+    "answer": "To return a product, go to your Orders page, select the item, and follow the return instructions."
+  }
+]
