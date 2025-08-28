@@ -28,6 +28,7 @@
 ---
 
 ## Project Structure
+```
 . 
 ├── config/ 
 │ └── stages.yaml # Configuration for pipeline stages 
@@ -60,6 +61,7 @@
 ├── README.md # Project documentation 
 ├── requirements.txt # Python dependencies 
 └── pyproject.toml # Project metadata and build configuration
+```
 
 
 ---
