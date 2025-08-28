@@ -1,9 +1,10 @@
 import argparse
 import json
-import logging
+from .logger import get_logger
 from pathlib import Path
 from .pipeline import LangGraphAgent
 
+logging = get_logger(__name__)
 
 def run(args):
     """Run the Langie bot with either sample or provided JSON input."""
