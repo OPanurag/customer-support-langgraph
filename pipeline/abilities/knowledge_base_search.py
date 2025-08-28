@@ -14,18 +14,29 @@ class KnowledgeBaseSearch:
         query = state.get("input", {}).get("text", "")
         if not query:
             state["knowledge_base"] = []
+            state["response"] = "No response generated"
             return state
 
-        # ✅ use search(), not query()
         results = self.retriever.search(query, top_k=self.top_k)
 
         # Normalize into pipeline output
-        state["knowledge_base"] = [
-            {
-                "question": r["question"],
-                "answer": r["answer"],
-                "doc": r["doc"]
-            }
-            for r in results
-        ]
+        kb_results = []
+        for r in results:
+            kb_results.append({
+                "id": r.get("id"),
+                "question": r.get("question"),
+                "answer": r.get("answer"),
+                "score": r.get("score", 1.0),
+                "metadata": r.get("metadata", {})
+            })
+
+        state["knowledge_base"] = kb_results
+
+        # Pick top answer as main response
+        if kb_results:
+            state["response"] = kb_results[0]["answer"]
+        else:
+            state["response"] = "No response generated"
+
         return state
+

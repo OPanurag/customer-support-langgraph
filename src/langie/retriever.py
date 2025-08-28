@@ -33,7 +33,6 @@ class Retriever:
             name=self.collection_name,
             embedding_function=SentenceTransformerEmbeddingFunction()
         )
-
     def search(self, query: str, top_k: int = 3):
         """Search FAQ KB using local embeddings + ChromaDB."""
         results = self.collection.query(
@@ -42,10 +41,16 @@ class Retriever:
         )
 
         hits = []
-        for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
+        for doc, meta, distance in zip(
+                results["documents"][0], 
+                results["metadatas"][0], 
+                results["distances"][0]
+            ):
             hits.append({
                 "question": meta.get("question"),
                 "answer": meta.get("answer"),
-                "doc": doc
+                "doc": doc,
+                "score": 1 - distance  # if distance is 0=perfect match, convert to similarity
             })
         return hits
+
