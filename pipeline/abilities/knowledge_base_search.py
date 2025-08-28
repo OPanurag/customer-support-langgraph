@@ -16,15 +16,15 @@ class KnowledgeBaseSearch:
             state["knowledge_base"] = []
             return state
 
-        results = self.retriever.query(query, k=self.top_k)
+        # ✅ use search(), not query()
+        results = self.retriever.search(query, top_k=self.top_k)
 
         # Normalize into pipeline output
         state["knowledge_base"] = [
             {
-                "id": r["id"],
-                "answer": r["text"],  # Chroma stores answer in doc text
-                "score": r["score"],
-                "metadata": r["metadata"]
+                "question": r["question"],
+                "answer": r["answer"],
+                "doc": r["doc"]
             }
             for r in results
         ]

@@ -24,3 +24,7 @@ pre-commit = "^3.8"
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+# ✅ Tell setuptools where to find your code
+[tool.setuptools.packages.find]
+where = ["src"]

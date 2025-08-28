@@ -3,8 +3,6 @@ import chromadb
 from chromadb.api.types import EmbeddingFunction
 from sentence_transformers import SentenceTransformer
 
-DB_PATH = "data/chroma"
-COLLECTION_NAME = "faq"
 
 class SentenceTransformerEmbeddingFunction(EmbeddingFunction):
     def __init__(self, model_name="all-MiniLM-L6-v2"):
@@ -16,13 +14,23 @@ class SentenceTransformerEmbeddingFunction(EmbeddingFunction):
 
 
 class Retriever:
-    def __init__(self):
+    def __init__(self, db_path: str = "data/chroma", collection_name: str = "faq"):
+        """
+        Retriever for ChromaDB-based FAQ Knowledge Base.
+        
+        Args:
+            db_path (str): Path where ChromaDB is persisted.
+            collection_name (str): Name of the collection to use.
+        """
+        self.db_path = db_path
+        self.collection_name = collection_name
+
         # Load persisted Chroma
-        self.client = chromadb.PersistentClient(path=DB_PATH)
+        self.client = chromadb.PersistentClient(path=self.db_path)
 
         # Pass in wrapper embedding function
         self.collection = self.client.get_or_create_collection(
-            name=COLLECTION_NAME,
+            name=self.collection_name,
             embedding_function=SentenceTransformerEmbeddingFunction()
         )
 
@@ -41,10 +49,3 @@ class Retriever:
                 "doc": doc
             })
         return hits
-
-
-# if __name__ == "__main__":
-#     retriever = Retriever()
-#     res = retriever.search("What is your return policy?")
-#     for r in res:
-#         print(f"Q: {r['question']}\nA: {r['answer']}\n")

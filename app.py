@@ -1,41 +1,62 @@
 # app.py
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from src.langie.pipeline import LangGraphAgent
-import uvicorn
+from pydantic import BaseModel
+from pipeline.abilities.knowledge_base_search import KnowledgeBaseSearch
 
-app = FastAPI(title="LangGraph Customer Support API")
+app = FastAPI()
 
-# Serve frontend
+# Mount static files (frontend)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Initialize LangGraph pipeline once
-AGENT = LangGraphAgent(config_path="config/stages.yaml")
+# Load pipeline components
+kb_search = KnowledgeBaseSearch(config={
+    "db_path": "data/chroma",
+    "collection": "faq",
+    "top_k": 3
+})
 
-@app.get("/")
-def index():
-    """Serve frontend HTML."""
-    return FileResponse("static/index.html")
+class ChatPayload(BaseModel):
+    customer_name: str
+    email: str
+    query: str
 
-@app.post("/run_pipeline")
-async def run_pipeline(request: Request):
-    """Endpoint to run LangGraph pipeline."""
-    payload = await request.json()
-    try:
-        response = AGENT.run(payload)
-        return JSONResponse(response)
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+@app.get("/", response_class=HTMLResponse)
+async def index():
+    with open("static/index.html") as f:
+        return f.read()
 
-# Allow CORS for local testing
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@app.post("/chat")
+async def chat(payload: ChatPayload):
+    # Build state for pipeline
+    state = {
+        "input": {"text": payload.query},
+        "customer_name": payload.customer_name,
+        "email": payload.email
+    }
 
-if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    # Run KB search
+    state = kb_search.run(state)
+
+    # Extract top answer if available
+    kb_results = state.get("knowledge_base", [])
+    if kb_results:
+        main_answer = kb_results[0].get("answer", "No answer found")
+    else:
+        main_answer = "Sorry, I couldn’t find an answer to your query."
+
+    # Build response JSON
+    return JSONResponse({
+        "customer": payload.customer_name,
+        "query": payload.query,
+        "response": main_answer,
+        "alternatives": [
+            {
+                "question": r.get("question"),
+                "answer": r.get("answer"),
+                "doc": r.get("doc")
+            }
+            for r in kb_results
+        ]
+    })
