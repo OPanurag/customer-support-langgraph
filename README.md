@@ -28,37 +28,38 @@
 ---
 
 ## Project Structure
-. ├── config/ 
-  │ └── stages.yaml # Configuration for pipeline stages 
-  ├── data/ 
-  │ ├── kb_faq.json # Knowledge base data 
-  │ └── chroma/ # Chroma database files 
-  ├── logs/ 
-  │ └── pipeline.log # Log file for pipeline execution 
-  ├── pipeline/ 
-  │ └── abilities/ # Core abilities for the pipeline 
-  │ └── knowledge_base_search.py 
-  ├── scripts/ 
-  │ ├── kb_ingest.py # Script for ingesting KB data 
-  │ └── run.sh # Shell script for running the project 
-  ├── src/langie/ # Main source code 
-  │ ├── main.py # Entry point for the application 
-  │ ├── abilities.py # Core abilities module 
-  │ ├── cli.py # Command-line interface 
-  │ ├── logger.py # Logging utilities 
-  │ ├── mcp_client.py # MCP client routing logic 
-  │ ├── models.py # Data models 
-  │ ├── pipeline.py # Pipeline orchestration 
-  │ └── retriever.py # Data retrieval logic 
-  ├── static/ 
-  │ └── index.html # Frontend for KB search 
-  ├── tests/ 
-  │ ├── test_pipeline.py # Unit tests for the pipeline 
-  │ └── test_retriever.py # Unit tests for the retriever 
-  ├── LICENSE # License file 
-  ├── README.md # Project documentation 
-  ├── requirements.txt # Python dependencies 
-  └── pyproject.toml # Project metadata and build configuration
+. 
+├── config/ 
+│ └── stages.yaml # Configuration for pipeline stages 
+├── data/ 
+│ ├── kb_faq.json # Knowledge base data 
+│ └── chroma/ # Chroma database files 
+├── logs/ 
+│ └── pipeline.log # Log file for pipeline execution 
+├── pipeline/ 
+│ └── abilities/ # Core abilities for the pipeline 
+│ └── knowledge_base_search.py 
+├── scripts/ 
+│ ├── kb_ingest.py # Script for ingesting KB data 
+│ └── run.sh # Shell script for running the project 
+├── src/langie/ # Main source code 
+│ ├── main.py # Entry point for the application 
+│ ├── abilities.py # Core abilities module 
+│ ├── cli.py # Command-line interface 
+│ ├── logger.py # Logging utilities 
+│ ├── mcp_client.py # MCP client routing logic 
+│ ├── models.py # Data models 
+│ ├── pipeline.py # Pipeline orchestration 
+│ └── retriever.py # Data retrieval logic 
+├── static/ 
+│ └── index.html # Frontend for KB search 
+├── tests/ 
+│ ├── test_pipeline.py # Unit tests for the pipeline 
+│ └── test_retriever.py # Unit tests for the retriever 
+├── LICENSE # License file 
+├── README.md # Project documentation 
+├── requirements.txt # Python dependencies 
+└── pyproject.toml # Project metadata and build configuration
 
 
 ---
