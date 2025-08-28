@@ -48,7 +48,7 @@ def save_ticket(ticket):
         json.dump(tickets, f, indent=4)
 
 # Threshold score to mark as resolved
-SCORE_THRESHOLD = 0.50
+SCORE_THRESHOLD = 0.25
 
 class ChatPayload(BaseModel):
     customer_name: str

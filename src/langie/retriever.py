@@ -50,7 +50,8 @@ class Retriever:
                 "question": meta.get("question"),
                 "answer": meta.get("answer"),
                 "doc": doc,
-                "score": 1 - distance  # if distance is 0=perfect match, convert to similarity
+                # "score": 1 - distance  # if distance is 0=perfect match, convert to similarity
+                "score": distance  # use distance directly
             })
         return hits
 
